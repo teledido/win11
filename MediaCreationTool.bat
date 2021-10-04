@@ -100,9 +100,9 @@ for %%/ in (%~n0 %*) do set ".=%%~/" & for /f %%C in ('cmd/q/v:on/recho;!.:~2^,1
 for %%/ in (%~n0 %*) do for %%A in (x86 x64) do if /i %%/ equ %%A set "ARCH=%%A"
 
 ::# parse KEY from script name or commandline - accepts the format: AAAAA-VVVVV-EEEEE-YYYYY-OOOOO
-for %%/ in (%KEY% %~n0 %*) do for /f "tokens=1-5 delims=-" %%a in ("%%/") do if "%%e" neq "" set "PKEY=%%/"
+for %%/ in (%KEY% %~n0 %*) do for /f "tokens=1-5 delims=-" %%a in ("%%/") do if "%%e" neq "" set "PKEY=%%/" & set "KEY="
 if defined PKEY set "PKEY1=%PKEY:~-1%" & set "PKEY28=%PKEY:~28,1%"
-if defined EDITION if "%PKEY1%" equ "%PKEY28%" set "KEY=%PKEY%"
+if defined EDITION if "%PKEY1%" equ "%PKEY28%" (set "KEY=%PKEY%") else set "PKEY="
 
 ::# parse NO_UPDATE from script name or commandline - dont download and apply latest LCU on upgrade [more C: space and might fail]
 for %%/ in (%~n0 %*) do if /i %%/ equ no_update set "NO_UPDATE=1"
@@ -370,6 +370,7 @@ set ACTION=%ACTION% /Pkey Defer& set OPTIONS=%OPTIONS% %UPDATE% %UNDO% /SkipSumm
 ::# generate PID.txt to preset EDITION on boot media - MCT install.esd indexes only, ProWS/ProEdu only via auto.cmd
 if defined KEY set AUTO_KEY=/Pkey %KEY%
 for %%/ in (Workstation WorkstationN Education EducationN) do if "Professional%%/" equ "%EDITION%" set "KEY="
+if not defined PKEY if "Enterprise" equ "%EDITION%" set "KEY=" &rem explicitly remove generic PID.txt for Enterprise
 if not defined KEY (del /f /q PID.txt 2>nul) else (echo;[PID]& echo;Value=%KEY%& echo;;Edition=%EDITION%)>PID.txt
 
 ::# generate auxiliary script files
