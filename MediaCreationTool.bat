@@ -2,9 +2,9 @@
 ::# Universal MCT wrapper script by AveYo - for all Windows 10 versions from 1507 to 21H2!
 ::# Nothing but Microsoft-hosted source links and no third-party tools - script just configures a xml and starts MCT
 ::# Ingenious support for business editions (Enterprise / VL) selecting language, x86, x64 or AiO inside the MCT GUI
-::# Changelog: 2021.10.04                      fix for long standing tr localization quirks; Skip TPM Check v2
+::# Changelog: 2021.10.05 Windows 11 Release                  solved tr localization quirks; Skip TPM Check v2
 ::# - improved script reliability; create iso directly; enhanced dialogs; args from script name or commandline 
-::# - 11: 22000.132+ / 21H2: 19044.1165 / 21H1: 19043.928 / 20H2: 19042.1052 / 2004: 19041.572 / 1909: 18363.1139
+::# - 11: 22000.194 / 21H2: 19044.1165 / 21H1: 19043.928 / 20H2: 19042.1052 / 2004: 19041.572 / 1909: 18363.1139
 
 ::# uncomment to skip gui dialog for MCT choice: 1507 to 2109 / 11 - or rename script:  "21H2 MediaCreationTool.bat"
 rem set MCT=2109
@@ -142,10 +142,12 @@ if %MCT%0 gtr 1 if %PRE%0 lss 1 goto choice-0 = cancel
 goto choice-%MCT%
 
 :choice-14
-set "VER=22000" & set "VID=11" & set "CB=22000.132.210809-2349.co_release_svc_refresh" & set "CT=2021/08/" & set "CC=1.4.1"
-set "CAB=%\\%download.microsoft.com/download/f/d/d/fddbe550-0dbf-44b4-9e60-6f0e73d654c0/products_20210415.cab"
+set "VER=22000" & set "VID=11" & set "CB=22000.194.210913-1444.co_release_svc_refresh" & set "CT=2021/10/" & set "CC=1.4.1"
+set "CAB=%\\%download.microsoft.com/download/0/d/b/0db6dfde-48c9-4d70-904e-462b46d8a473/products_20211004.cab"
+set "EXE=%\\%software-download.microsoft.com/download/pr/888969d5-f34g-4e03-ac9d-1f9786c69161/MediaCreationToolW11.exe"
+rem rofl release MCT cant do upgrade or upgrade media, must use *@#& Windows11InstallationAssistant (Windows10UpgraderApp) for it 
 set "EXE=%\\%download.microsoft.com/download/d/5/2/d528a4e0-03f3-452d-a98e-3e479226d166/MediaCreationTool21H1.exe"
-goto process ::# windows 11 : usability and ui downgrade, and even more ChrEdge bloat - pre-release
+goto process ::# windows 11 : usability and ui downgrade, and even more ChrEdge bloat - release
 
 :choice-13
 set "VER=19044" & set "VID=21H2" & set "CB=19044.1165.210806-1742.21h2_release_svc_refresh" & set "CT=2021/09/" & set "CC=1.4.1"
@@ -388,7 +390,7 @@ powershell -win 0 -nop -c ";"
 set "LABEL=%XI% %VIS%" & for %%s in (%EDITION% %LANGCODE% %ARCH%) do call set "LABEL=%%LABEL%% %%s"
 call :DIR2ISO "%SystemDrive%\ESD\Windows" "%ROOT%\%LABEL%.iso" "%CB%"
 if not errorlevel 1 rd /s/q "%SystemDrive%\ESD\Windows" 2>nul
-timeout /t 3 >nul
+timeout /t 5 >nul
 
 ::###############
 EXIT/B ALL DONE
@@ -439,8 +441,8 @@ EXIT/B ALL DONE
    $C = "cmd /q $N (c) AveYo, 2021 /d/x/r>nul (erase /f/s/q %systemdrive%\`$windows.~bt\appraiserres.dll"
    $C+= '&md 11&cd 11&ren vd.exe vdsldr.exe&robocopy "../" "./" "vdsldr.exe"&ren vdsldr.exe vd.exe&start vd -Embedding)&rem;'
    $K = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\vdsldr.exe'
-   $0 = ni $K; sp $K Debugger $C -force
-   $0 = sp HKLM:\SYSTEM\Setup\MoSetup 'AllowUpgradesWithUnsupportedTPMOrCPU' 1 -type dword -force -ea 0
+   $0 = ni $K -force -ea 0; sp $K Debugger $C -force
+   $0 = sp 'HKLM:\SYSTEM\Setup\MoSetup' 'AllowUpgradesWithUnsupportedTPMOrCPU' 1 -type dword -force -ea 0
  }
 #:: MCT custom preset processing
  switch ($PRESET) {
@@ -713,7 +715,7 @@ function :PRODUCTS_XML { [xml]$xml = [IO.File]::ReadAllText("$pwd\products.xml",
    }
  }}
  $lines = ([io.file]::ReadAllText($env:0)-split':PS_INSERT_BUSINESS_CSV\:')[1]; $insert = $false
- if ($null -ne $lines -and $env:INSERT_BUSINESS -ge 1 -and 22000,19044,19042,19041,18363,15063,14393 -contains $ver) {
+ if ($null -ne $lines -and $env:INSERT_BUSINESS -ge 1 -and 19044,19042,19041,18363,15063,14393 -contains $ver) {
    $csv = ConvertFrom-CSV -Input $lines.replace('sr-rs','sr-latn-rs') | & { process { if ($_.Ver -eq $ver) {$_} } }
    $edi = @{ent='Enterprise';enN='EnterpriseN';edu='Education';edN='EducationN';clo='Cloud';clN='CloudN';
             pro='Professional';prN='ProfessionalN'}
@@ -1215,79 +1217,3 @@ function :PRODUCTS_XML { [xml]$xml = [IO.File]::ReadAllText("$pwd\products.xml",
 ::#,19044,vol,uk-ua,3560300978,2560869654,ef8b3d474e7ad1e17af42944e24dcd959d9827a2,5023d2cd938ff1546f7f8c392cb1b42ddd94b0cf,c,d
 ::#,19044,vol,zh-cn,3803796929,2805393938,d262ad930f0f5554a061d2cb77ce3d305a3a65c0,d26a5e87bb96535b3704d671c69aab338925f2e1,d,c
 ::#,19044,vol,zh-tw,3780899927,2785302702,f941f292e144189917ace0a03ada3002940c2232,ef2887d062fa12cf23fee5a5570f329e7969ad5d,d,d
-::#,22000,ret,ar-sa,3583316326,,410af1a315b5649257cf00556adec8a4d4819cf7,,c,
-::#,22000,ret,bg-bg,3629687844,,f1b9c5a8925f73de0505bf371ffbfdc8fd81b482,,c,
-::#,22000,ret,cs-cz,3624659767,,86a4d9e7b149bd6f6eb824b2202eca42b1e68044,,d,
-::#,22000,ret,da-dk,3647296779,,4b94e3fc47b0fe708b5da74ed6e844f933a3d226,,d,
-::#,22000,ret,de-de,3752132208,,d074866ec32c441788502f31a963ae6d223cb1fe,,d,
-::#,22000,ret,el-gr,3647287583,,863653f797a876db08a487aba53cc271658eccf5,,d,
-::#,22000,ret,en-gb,3735644945,,5f9570231f4f557cdb9cbd6d63b7e9b722496681,,d,
-::#,22000,ret,en-us,3748914969,,966cbea0f8a06f27f64658a5db8a9f0dd43c77ed,,d,
-::#,22000,ret,es-es,3747642346,,93db217252f3b79e8bdd890339c9c70e2002e6e0,,d,
-::#,22000,ret,es-mx,3589906878,,6f47fcca6729e8023452094f350dcc284f9d477a,,d,
-::#,22000,ret,et-ee,3602211257,,063a5554c2becfc00973ea8cbe7099df69a85c8c,,d,
-::#,22000,ret,fi-fi,3627682542,,1737eb05ac40ac7967fab77c88640794687349f6,,d,
-::#,22000,ret,fr-ca,3589489013,,003e57f00ef926be0d975d6d70941c1862ebdb4f,,d,
-::#,22000,ret,fr-fr,3754850063,,886c1ca6f217b8cf583d55b3c34a782ac4f88afe,,d,
-::#,22000,ret,he-il,3546086225,,7c40bc5884fc1c745ebc5053e3fc6edd027ef44c,,d,
-::#,22000,ret,hr-hr,3605046277,,8bb0f9acb6d75503f74ac196cad3f5b12907de31,,d,
-::#,22000,ret,hu-hu,3620481836,,4fad05b8b23dbc403c3583717637966318c48b3d,,d,
-::#,22000,ret,it-it,3675137777,,034f05fb81a15e857374cc51466d0db9b831b93d,,d,
-::#,22000,ret,ja-jp,3732753328,,f1b0b7c82ece337fa3836c339eff203d603a1144,,d,
-::#,22000,ret,ko-kr,3572585818,,0a9443823e621fb77ab827def4054d0e5ec53d01,,c,
-::#,22000,ret,lt-lt,3600000489,,2b5165c439c152831376ddc297e2dd10aa732f81,,d,
-::#,22000,ret,lv-lv,3599419874,,e8df278adb9c258bfaa6986a869285c8e7c367e6,,d,
-::#,22000,ret,nb-no,3618910283,,0f73f893ca517d153929fa9be02453339a4833a4,,d,
-::#,22000,ret,nl-nl,3624341483,,01d9a99993f448b4e826a960f5a82164a3f6316c,,c,
-::#,22000,ret,pl-pl,3644350929,,a1f7e88f602ae2d450c4459da26ed8aadf401e87,,c,
-::#,22000,ret,pt-br,3589692090,,fbc2a853deaea7e6df538634b5c420b23f5ebd75,,d,
-::#,22000,ret,pt-pt,3669988808,,50f7dc90167c434c2a03fa405aa45f2e250f60fc,,c,
-::#,22000,ret,ro-ro,3607667567,,c6248ac88b149aa2ba265cab7b680486bd5df490,,d,
-::#,22000,ret,ru-ru,3589442540,,f92975ad1887ec325e768c244cfa347ef8c80a85,,d,
-::#,22000,ret,sk-sk,3610453257,,de07775aa09586485f6fca1ceaf0cd2dcee1b8c0,,c,
-::#,22000,ret,sl-si,3605518791,,db8a61d1f228e646d6d77513a2289482605d7fd1,,d,
-::#,22000,ret,sr-rs,3516947635,,8c788c2becb01cb61705b2d3b08ac41903248df9,,c,
-::#,22000,ret,sv-se,3627750740,,0449e60ca2ffb0c711f1c1846783e9d01f5c7a42,,d,
-::#,22000,ret,th-th,3535448206,,ffd63b826628dc4e3f8b925be1c1f6c1bd4e90b1,,d,
-::#,22000,ret,tr-tr,3528193108,,7b17cd645ce262e91aba22887a3dabe204e5242b,,c,
-::#,22000,ret,uk-ua,3526629873,,1e6be24945e6d16453c990ad2efa9001ee0215a3,,d,
-::#,22000,ret,zh-cn,3809043357,,c2688015d7416d37884cbc44651b93b00d874850,,c,
-::#,22000,ret,zh-tw,3740408094,,9453708f66b61f35c3810e7921a4684ad00e4e85,,d,
-::#,22000,vol,ar-sa,3508136521,,b655af232485ce60c4f6e6d2bf398e77f1d37d80,,c,
-::#,22000,vol,bg-bg,3557807393,,da4a41723c6e4fb84fdc454e5c6e371416c26d6a,,c,
-::#,22000,vol,cs-cz,3557663913,,b5907351c4aa789e04f6463f72588c9fb3725527,,c,
-::#,22000,vol,da-dk,3566444875,,d2d862c94b29ac362b31fbddfc4ed4529b651b07,,c,
-::#,22000,vol,de-de,3684037623,,355855d095926993ed378d5dba4f708bd8097f07,,c,
-::#,22000,vol,el-gr,3560501265,,6bd63125788d60c99991a117ebb01f2c646e55b1,,c,
-::#,22000,vol,en-gb,3641285707,,014131bf8cc7c5aceddfe2fd08f75bcc093fb6e3,,c,
-::#,22000,vol,en-us,3644121998,,77349bdc0c6e4968db60b678c8dba2cd34530678,,c,
-::#,22000,vol,es-es,3652812219,,4f7870e288c7b856d4499a9a898966a2187e8297,,c,
-::#,22000,vol,es-mx,3497191326,,7e276e251f329a4e59535a962954fca46d186526,,c,
-::#,22000,vol,et-ee,3522209675,,b2c00af3261dde51c82ce32f4cdf974d35863141,,d,
-::#,22000,vol,fi-fi,3552932610,,d1e9bbdaaa90e5c19d8b98b116e465bbe63ae295,,d,
-::#,22000,vol,fr-ca,3532729342,,1960f99b222863c581736f5757b799bde7dbeefc,,d,
-::#,22000,vol,fr-fr,3642623614,,3cb99ef08d1c8b43b257f304f2789fa907382f75,,d,
-::#,22000,vol,he-il,3496759455,,967f23f4159073e96352c9c8e75e8109f6891ce8,,d,
-::#,22000,vol,hr-hr,3531052162,,5b9c3df41e7db46f9bfa5ece06c64ee34d8bdc80,,d,
-::#,22000,vol,hu-hu,3549040526,,0f9853ef3e04bfa1edcbc9731685df04b223e728,,c,
-::#,22000,vol,it-it,3601047615,,97fffb3c4f061ae94edcbc644ace1549d4cb0cec,,d,
-::#,22000,vol,ja-jp,3684020489,,87280ecc92ec8975a197d3a96a2fe7454c6d75a3,,d,
-::#,22000,vol,ko-kr,3514624025,,184f0265da295ff676755a7912e3e5f84dd58254,,d,
-::#,22000,vol,lt-lt,3524164558,,0920086a6072ab18b89d41e32619dfa0b43e4d3f,,c,
-::#,22000,vol,lv-lv,3524469208,,738f7e6eabccc71df22549d9ab585bf3c996f73a,,c,
-::#,22000,vol,nb-no,3552213730,,07be42354c0c8e77361b2269cf18f820e7fbb017,,c,
-::#,22000,vol,nl-nl,3550728565,,074bac75e804cb8c12bc82fb95c0636713ab0de0,,c,
-::#,22000,vol,pl-pl,3575760052,,8a8b41dbc1eb66be8a9bc35cea46f350c73d602d,,c,
-::#,22000,vol,pt-br,3500041130,,c5269deace016b37fd7a480b56f4a646f56100b9,,c,
-::#,22000,vol,pt-pt,3570573190,,204ded9b4f1eac1a026177f4a0ef8bd75433539e,,c,
-::#,22000,vol,ro-ro,3525902250,,16ba6e32afdc4734b7c6be8b7d5c70bb641d476c,,c,
-::#,22000,vol,ru-ru,3500954654,,77100a848e8431fdbcafc92ddf2978ac2d9ca11c,,c,
-::#,22000,vol,sk-sk,3542127077,,f4a7a11b99e02737e5d590a6927974cd02fd0368,,c,
-::#,22000,vol,sl-si,3538541123,,968581fe408abcd8e8cafb28c2dbd5ab3e56bc3f,,c,
-::#,22000,vol,sr-rs,3428059804,,2a5ffba0b12dc6ffd1e28003f5eb0e44fa8eb049,,d,
-::#,22000,vol,sv-se,3551100059,,2be4f0940bfe32642c23dc1c6282e8ba91944dd8,,c,
-::#,22000,vol,th-th,3448877500,,ef11113706b4ddc1368b25b928a7b2bc8f8f8010,,c,
-::#,22000,vol,tr-tr,3447762877,,0eea822185c20767fd5ad40a3367a1156ce1f422,,c,
-::#,22000,vol,uk-ua,3453971472,,d1b457622d20ca3edd9708e126881a7d78246d74,,c,
-::#,22000,vol,zh-cn,3723366348,,923f912bdfd9374d9890fea8e0fa76a57d3db524,,c,
-::#,22000,vol,zh-tw,3683258981,,d3bd7de86e3ab27a57910faf919f240c35aca807,,d,
