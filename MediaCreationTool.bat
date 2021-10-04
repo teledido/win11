@@ -2,9 +2,9 @@
 ::# Universal MCT wrapper script by AveYo - for all Windows 10 versions from 1507 to 21H2!
 ::# Nothing but Microsoft-hosted source links and no third-party tools - script just configures a xml and starts MCT
 ::# Ingenious support for business editions (Enterprise / VL) selecting language, x86, x64 or AiO inside the MCT GUI
-::# Changelog: 2021.09.25 Windows 11 ; 2021.09.30 fix Auto Setup preset not launching
+::# Changelog: 2021.10.04                      fix for long standing tr localization quirks; Skip TPM Check v2
 ::# - improved script reliability; create iso directly; enhanced dialogs; args from script name or commandline 
-::# - 11: 22000.132 / 21H2: 19044.1165 / 21H1: 19043.928 / 20H2: 19042.1052 / 2004: 19041.572 / 1909: 18363.1139
+::# - 11: 22000.132+ / 21H2: 19044.1165 / 21H1: 19043.928 / 20H2: 19042.1052 / 2004: 19041.572 / 1909: 18363.1139
 
 ::# uncomment to skip gui dialog for MCT choice: 1507 to 2109 / 11 - or rename script:  "21H2 MediaCreationTool.bat"
 rem set MCT=2109
@@ -50,7 +50,7 @@ set/a INSERT_BUSINESS=1
 
 ::# MCT Version choice dialog items and default-index
 set VERSIONS=1507,1511,1607,1703,1709,1803,1809,1903,1909,20H1,20H2,21H1,21H2,11
-set dV=13
+set dV=14
 
 ::# MCT Preset choice dialog items and default-index
 set PRESETS=Auto Setup,Create ISO,Create USB,Select in MCT
@@ -89,7 +89,7 @@ if defined ISO if not defined AUTO set/a PRE=2 & if defined MCT set/a CREATE=1
 ::# parse EDITION from script name or commandline - accept one of the staged editions in MCT install.esd - see sources\product.ini
 set _=%EDITION% %~n0 %* & rem ::# also accepts the alternative names: Home, HomeN, Pro, ProN, Edu, EduN
 for %%/ in (%_:Home=Core% %_:Pro =Professional % %_:ProN=ProfessionalN% %_:Edu =Education % %_:EduN=EducationN%) do (
-for %%E in ( ProfessionalEducation ProfessionalEducationN ProfessionalWorkstation ProfessionalWorkstationN
+for %%E in ( ProfessionalEducation ProfessionalEducationN ProfessionalWorkstation ProfessionalWorkstationN Cloud CloudN
  Core CoreN CoreSingleLanguage CoreCountrySpecific Professional ProfessionalN Education EducationN Enterprise EnterpriseN
 ) do if /i %%/ equ %%E set "EDITION=%%E")
 
@@ -242,7 +242,7 @@ goto process ::# fastest for potato PCs
 %<%:0c " CANCELED "%>% & timeout /t 3 >nul & EXIT/B
 
 :start
-@title %~nx0& color 1f& mode 120,30& echo off& set "ROOT=%~dp0"& set "0=%~f0"& set "__COMPAT_LAYER=Installer"
+@title %~nx0& mode 120,30& color 1f& echo off& set "ROOT=%~dp0"& set "0=%~f0"& set "__COMPAT_LAYER=Installer"
 ::# self-echo top 1-20 lines of script
 <"%~f0" (set/p \=&for /l %%/ in (1,1,19) do set \=& set/p \=& call echo;%%\%%)
 ::# lean xp+ color macros by AveYo:  %<%:af " hello "%>>%  &  %<%:cf " w\"or\"ld "%>%   for single \ / " use .%|%\  .%|%/  \"%|%\"
@@ -285,10 +285,12 @@ if %VER% leq 16299 (set MEDIA_EDITION=%MEDIA_EDITION:ProfessionalEducation=Educa
 if %VER% leq 10586 (set MEDIA_EDITION=%MEDIA_EDITION:Enterprise=Professional%)
 if %VER% leq 15063 if %INSERT_BUSINESS%0 lss 1 (set MEDIA_EDITION=%MEDIA_EDITION:Enterprise=Professional%)
 if %VER% leq 10586 if %UNHIDE_BUSINESS%0 lss 1 (set MEDIA_EDITION=%MEDIA_EDITION:Education=Professional%)
+if %VER% neq 15063 (set MEDIA_EDITION=%MEDIA_EDITION:Cloud=Professional%) 
 if not defined EDITION if "%MEDIA_EDITION%" neq "%OS_EDITION%" set "EDITION=%MEDIA_EDITION%"
 
 ::# generic key preset - only for staged editions in MCT install.esd - see sources\product.ini
 for %%/ in (%MEDIA_EDITION%) do for %%K in (
+  V3WVW-N2PV2-CGWC3-34QGF-VMJ2C.Cloud                     NH9J3-68WK7-6FB93-4K3DF-DJ4F6.CloudN 
   YTMG3-N6DKC-DKB77-7M9GH-8HVX7.Core                      4CPRK-NM3K3-X6XXQ-RXX86-WXCHW.CoreN
   BT79Q-G7N6G-PGBYW-4YWX6-6F4BT.CoreSingleLanguage        N2434-X9D7W-8PF6X-8DV9T-8TYMD.CoreCountrySpecific
   VK7JG-NPHTM-C97JM-9MPGT-3V66T.Professional              2B87N-8KFHP-DKV6R-Y2C8J-PKCKT.ProfessionalN
@@ -431,8 +433,14 @@ EXIT/B ALL DONE
    }
    popd
  }
-#:: Skip TPM Check on Dynamic Update for 11 - just read it from standalone toggle file to not duplicate code here
- if ($11) {$env:skip_tpm_enabled=1; iex ([io.file]::ReadAllText("$pwd\Skip_TPM_Check_on_Dynamic_Update.cmd")-split'\$\:code;')[1]}
+#:: Skip TPM Check on Dynamic Update v2 - also available as standalone toggle script in the MCT subfolder
+ if ($11) {
+   $C = "cmd /q $N (c) AveYo, 2021 /d/x/r>nul (erase /f/s/q %systemdrive%\`$windows.~bt\appraiserres.dll"
+   $C+= '&md 11&cd 11&ren vd.exe vdsldr.exe&robocopy "../" "./" "vdsldr.exe"&ren vdsldr.exe vd.exe&start vd -Embedding)&rem;'
+   $K = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\vdsldr.exe'
+   $0 = ni $K; sp $K Debugger $C -force
+   $0 = sp HKLM:\SYSTEM\Setup\MoSetup 'AllowUpgradesWithUnsupportedTPMOrCPU' 1 -type dword -force -ea 0
+ }
 #:: MCT custom preset processing
  switch ($PRESET) {
    'Auto Setup' {
@@ -471,6 +479,7 @@ EXIT/B ALL DONE
  }
 #:: undo workaround for version 1703 and earlier not having media selection switches
  MCTCompatUndo
+#,#
 '@; [io.file]::WriteAllText('custom_preset.ps1', $text)
 :generate_custom_preset_ps1
 ::------------------------------------------------------------------------------------------------------------------------------::
@@ -499,6 +508,7 @@ for /f "tokens=2*" %%R in ('reg query %NT% /v CurrentBuildNumber /reg:64 2^>nul'
 ::# media selection from PID.txt - get it verbosely in case auto.cmd is reused without MediaCreationTool.bat
 set Value=& set Edition=& if exist PID.txt for /f "delims=" %%v in (PID.txt) do (set %%v)2>nul
 if defined Value for %%K in (
+  Cloud.V3WVW-N2PV2-CGWC3-34QGF-VMJ2C                   CloudN.NH9J3-68WK7-6FB93-4K3DF-DJ4F6 
   Core.YTMG3-N6DKC-DKB77-7M9GH-8HVX7                    CoreN.4CPRK-NM3K3-X6XXQ-RXX86-WXCHW
   CoreSingleLanguage.BT79Q-G7N6G-PGBYW-4YWX6-6F4BT      CoreCountrySpecific.N2434-X9D7W-8PF6X-8DV9T-8TYMD
   Professional.VK7JG-NPHTM-C97JM-9MPGT-3V66T            ProfessionalN.2B87N-8KFHP-DKV6R-Y2C8J-PKCKT
@@ -541,6 +551,12 @@ set NT="HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
 :skip_tpm_check_on_dynamic_update - also available as standalone toggle script in the MCT subfolder
 set "0=%~f0"& powershell -nop -c "iex ([io.file]::ReadAllText($env:0)-split'skip\:tpm.*')[1];" &exit/b skip:tpm
   $S = gi -force 'setupprep.exe' -ea 0; if ($S.VersionInfo.FileBuildPart -lt 22000) {return} #:: abort if not 11 media
+  $C = "cmd /q $N (c) AveYo, 2021 /d/x/r>nul (erase /f/s/q %systemdrive%\`$windows.~bt\appraiserres.dll"
+  $C+= '&md 11&cd 11&ren vd.exe vdsldr.exe&robocopy "../" "./" "vdsldr.exe"&ren vdsldr.exe vd.exe&start vd -Embedding)&rem;'
+  $K = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\vdsldr.exe'
+  $0 = ni $K; sp $K Debugger $C -force
+  $0 = sp HKLM:\SYSTEM\Setup\MoSetup 'AllowUpgradesWithUnsupportedTPMOrCPU' 1 -type dword -force -ea 0
+#,#
 '@; [io.file]::WriteAllText('auto.cmd', $text)
 :generate_auto_cmd
 ::------------------------------------------------------------------------------------------------------------------------------::
@@ -548,28 +564,24 @@ set "0=%~f0"& powershell -nop -c "iex ([io.file]::ReadAllText($env:0)-split'skip
 :generate_Skip_TPM_Check_on_Dynamic_Update_cmd $text = @'
 @(set "0=%~f0"^)#) & powershell -nop -c iex([io.file]::ReadAllText($env:0)) & exit/b
 #:: double-click to run or just copy-paste into powershell - it's a standalone hybrid script
+#:: v2 using ifeo instead of wmi - increased compatibility at the cost of showing a cmd briefly on diskmgmt 
 
-$_Paste_in_Powershell = { $:code;  
-  $N = 'Skip TPM Check on Dynamic Update'; $toggle = $null -eq $env:skip_tpm_enabled; $off = $false
-  $M = sp HKLM:\SYSTEM\Setup\MoSetup 'AllowUpgradesWithUnsupportedTPMOrCPU' 1 -type dword -force -ea 0
-  $M = sc.exe config Winmgmt start= demand; sp HKLM:\SOFTWARE\Microsoft\Wbem 'Enable Costly Providers' 0 -type dword -force -ea 0
+$_Paste_in_Powershell = {
+  $N = 'Skip TPM Check on Dynamic Update'
   $B = gwmi -Class __FilterToConsumerBinding -Namespace 'root\subscription' -Filter "Filter = ""__eventfilter.name='$N'""" -ea 0
   $C = gwmi -Class CommandLineEventConsumer -Namespace 'root\subscription' -Filter "Name='$N'" -ea 0
   $F = gwmi -Class __EventFilter -NameSpace 'root\subscription' -Filter "Name='$N'" -ea 0
-  if ($B -or $C -or $F) { $B | rwmi; $C | rwmi; $F | rwmi; $off = $true }
-  if ($toggle -and $off) { write-host -fore 0xf -back 0xd "`n $N [REMOVED] run again to install "; timeout /t 5; return }
-  $P = "$([environment]::SystemDirectory)\cmd.exe"; $T = "$P /q $N (c) AveYo, 2021 /d /rerase appraiserres.dll /f /s /q"
-  $D = "$($P[0]):\`$WINDOWS.~BT"; $Q = "SELECT SessionID from Win32_ProcessStartTrace WHERE ProcessName='vdsldr.exe'"
-  $F = swmi -Class __EventFilter -NameSpace 'root\subscription' -args @{
-    Name = $N; EventNameSpace = 'root\cimv2'; QueryLanguage = 'WQL'; Query = $Q} -PutType 2 -ea 0
-  $C = swmi -Class CommandLineEventConsumer -Namespace 'root\subscription' -args @{
-    Name = $N; WorkingDirectory = $D; ExecutablePath = $P; CommandLineTemplate = $T; Priority = 128} -PutType 2 -ea 0
-  $B = swmi -Class __FilterToConsumerBinding -Namespace 'root\subscription' -args @{Filter=$F;Consumer=$C} -PutType 2 -ea 0
-  if ($toggle) { write-host -fore 0xf -back 0x2 "`n $N [INSTALLED] run again to remove "; timeout /t 5 } ; $:code;
+  if ($B) { $B | rwmi } ; if ($C) { $C | rwmi } ; if ($F) { $F | rwmi }
+  $C = "cmd /q $N (c) AveYo, 2021 /d/x/r>nul (erase /f/s/q %systemdrive%\`$windows.~bt\appraiserres.dll"
+  $C+= '&md 11&cd 11&ren vd.exe vdsldr.exe&robocopy "../" "./" "vdsldr.exe"&ren vdsldr.exe vd.exe&start vd -Embedding)&rem;'
+  $K = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\vdsldr.exe'
+  if (test-path $K) {ri $K -force -ea 0; write-host -fore 0xf -back 0xd "`n $N [REMOVED] run again to install "; timeout /t 5}
+  else {$0=ni $K; sp $K Debugger $C -force; write-host -fore 0xf -back 0x2 "`n $N [INSTALLED] run again to remove ";timeout /t 5}
+  $0 = sp HKLM:\SYSTEM\Setup\MoSetup 'AllowUpgradesWithUnsupportedTPMOrCPU' 1 -type dword -force -ea 0
 } ; start -verb runas powershell -args "-nop -c & {`n`n$($_Paste_in_Powershell-replace'"','\"')}"
 $_Press_Enter
+#,#
 '@; [io.file]::WriteAllText('Skip_TPM_Check_on_Dynamic_Update.cmd', $text)
-[io.file]::AppendAllText('auto.cmd', ($text -split '\$\:code;')[1]) #:: also append the code to auto.cmd 
 :generate_Skip_TPM_Check_on_Dynamic_Update_cmd
 ::------------------------------------------------------------------------------------------------------------------------------::
 
@@ -589,6 +601,7 @@ $_Press_Enter
 >>%ini% echo;cmd, "/c reg add HKLM\SYSTEM\Setup\LabConfig /v %By%passRAMCheck /d 1 /t reg_dword /f"
 >>%ini% echo;%%SYSTEMDRIVE%%\setup.exe
 @dism /unmount-wim /mountdir:C:\ESD\AveYo /%DO% & rd /s /q C:\ESD\AveYo & del /f /q sources\appraiserres.dll>nul
+::,::
 '@; [io.file]::WriteAllText('Skip_TPM_Check_on_Media_Boot.cmd', $text)
 :generate_Skip_TPM_Check_on_Media_Boot_cmd
 ::------------------------------------------------------------------------------------------------------------------------------::
@@ -597,9 +610,9 @@ $_Press_Enter
 (for /f "tokens=2*" %%R in ('reg query "%~1" /v "%~2" /se "," 2^>nul') do set "%~3=%%S")& exit/b
 ::------------------------------------------------------------------------------------------------------------------------------::
 
-$:DIR2ISO: #:: [PARAMS] "directory" "file.iso" [optional]"label"
-set ^ #="$f0=[io.file]::ReadAllText($env:0);$0=($f0-split'\$%0:.*')[1];$1=$env:1-replace'([`@$])','`$1';iex(\"$0 `r`n %0 $1\")"
-set ^ #=& set "0=%~f0"& set 1=%*& powershell -nop -c %#%& exit/b %errorcode%
+#:DIR2ISO:#  [PARAMS] "directory" "file.iso" [optional]"label"
+set ^ #=$f0=[io.file]::ReadAllText($env:0); $0=($f0-split '#\:DIR2ISO\:' ,3)[1]; $1=$env:1-replace'([`@$])','`$1'; iex($0+$1)
+set ^ #=& set "0=%~f0"& set 1=;%0 %*& powershell -nop -c "%#%"& exit/b %errorcode%
 function :DIR2ISO ($dir, $iso, $vol='DVD_ROM') {if (!(test-path -Path $dir -pathtype Container)) {"[ERR] $dir\";exit 1}; $code=@"
  using System; using System.IO; using System.Runtime.Interop`Services; using System.Runtime.Interop`Services.ComTypes;
  public class dir2iso {public int AveYo=2021; [Dll`Import("shlwapi",CharSet=CharSet.Unicode,PreserveSig=false)]
@@ -620,15 +633,15 @@ function :DIR2ISO ($dir, $iso, $vol='DVD_ROM') {if (!(test-path -Path $dir -path
  $fsi=new-object -ComObject IMAPI2FS.MsftFileSystemImage; $fsi.FileSystemsToCreate=4; $fsi.FreeMediaBlocks=0
  if ($bootable) {$fsi.BootImageOptionsArray=$BOOT}; $CONTENT=$fsi.Root; $CONTENT.AddTree($dir,$false); $fsi.VolumeName=$vol
  $obj=$fsi.CreateResultImage(); $r=[dir2iso]::Create($iso,[ref]$obj.ImageStream,$obj.BlockSize,$obj.TotalBlocks) };[GC]::Collect()
-} $:DIR2ISO: #:: export directory as (bootable) udf iso - lean and mean snippet by AveYo, 2021
+} #:DIR2ISO:#  export directory as (bootable) udf iso - lean and mean snippet by AveYo, 2021
 
 ::# there were other such solutions before :DIR2ISO, but none was as reliable (and non bloated)
 ::# would be nice to mention the source of inspiration, not just rename some vars and make it your own
 ::------------------------------------------------------------------------------------------------------------------------------::
 
-$:CHOICE: #:: [PARAMS] indexvar "c,h,o,i,c,e,s"  [OPTIONAL]  default-index "title" fontsize backcolor forecolor winsize
-set ^ #="$f0=[io.file]::ReadAllText($env:0);$0=($f0-split'\$%0:.*')[1];$1=$env:1-replace'([`@$])','`$1';iex(\"$0 `r`n %0 $1\")"
-set ^ #=& set "0=%~f0"& set 1=%*& (for /f "usebackq" %%/ in (`powershell -nop -c %#%`) do set "%1=%%/")& exit/bat/ps1
+#:CHOICE:#  [PARAMS] indexvar "c,h,o,i,c,e,s"  [OPTIONAL]  default-index "title" fontsize backcolor forecolor winsize
+set ^ #=$f0=[io.file]::ReadAllText($env:0); $0=($f0-split '#\:CHOICE\:' ,3)[1]; $1=$env:1-replace'([`@$])','`$1'; iex($0+$1)
+set ^ #=&set "0=%~f0"& set 1=;%0 %*& (for /f %%x in ('powershell -nop -c "%#%"') do set "%1=%%x")& exit/b
 function :CHOICE ($index,$choices,$def=1,$title='Choices',[int]$sz=12,$bc='MidnightBlue',$fc='Snow',[string]$win='300') {
  [void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms'); $f=new-object Windows.Forms.Form; $global:ret=''
  $bt=@(); $i=1; $ch=($choices+',Cancel').split(','); $ch |foreach {$b=New-Object Windows.Forms.Button; $b.Font='Tahoma,'+$sz
@@ -638,23 +651,23 @@ function :CHOICE ($index,$choices,$def=1,$title='Choices',[int]$sz=12,$bc='Midni
  $f.Text=$title; $f.BackColor=$bc; $f.ForeColor=$fc; $f.StartPosition=4; $f.AutoSize=1; $f.AutoSizeMode=0; $f.MaximizeBox=0
  $f.AcceptButton=$bt[$def-1]; $f.CancelButton=$bt[-1]; $f.Add_Shown({$f.Activate();$bt[$def-1].focus()})
  $null=$f.ShowDialog(); $index=$global:ret; if ($index -eq $ch.length) {return 0} else {return $index}
-} $:CHOICE: #:: gui dialog with inverted focus returning selected index - lean and mean snippet by AveYo, 2018 - 2021
+} #:CHOICE:#  gui dialog with inverted focus returning selected index - lean and mean snippet by AveYo, 2018 - 2021
 ::------------------------------------------------------------------------------------------------------------------------------::
 
-$:CHOICE.2x: #:: [INTERNAL]
-set ^ #="$f0=[io.file]::ReadAllText($env:0);$0=($f0-split'\$%0:.*')[1];$1=$env:1-replace'([`@$])','`$1';iex(\"$0 `r`n %0 $1\")"
-set ^ #=&set "0=%~f0"&set 1=%*&(for /f "tokens=1,2 usebackq" %%i in (`powershell -nop -c %#%`) do set %1=%%i&set %5=%%j)& exit/b
-function :CHOICE.2x {if (!(get-command :CHOICE -ea 0)) {iex($f0-split'\$\:CHOICE\:.*')[1]}; function :LOOP { $a=$args
+#:CHOICE.2x:#  [INTERNAL]
+set ^ #=$f0=[io.file]::ReadAllText($env:0); $0=($f0-split '#\:CHOICE.2x\:' ,3)[1]; $1=$env:1-replace'([`@$])','`$1'; iex($0+$1)
+set ^ #=&set "0=%~f0"&set 1=;%0 %*&(for /f "tokens=1,2" %%x in ('powershell -nop -c "%#%"') do set %1=%%x&set %5=%%y)& exit/b
+function :CHOICE.2x {if (!(get-command :CHOICE -ea 0)) {iex($f0-split '#\:CHOICE\:' ,3)[1]}; function :LOOP { $a=$args
  $c1 = @($a[0], $a[1], $a[2], $a[3],  $a[-4], $a[-3], $a[-2], $a[-1]); $r1= :CHOICE @c1; if ($r1 -lt 1) {return "0 0"}
  $a_7_ = $a[1].Split(',')[$r1-1] + ' ' + $a[7] #:: use 1st dialog result in the title for 2nd dialog
  $c2 = @($a[4], $a[5], $a[6], $a_7_,  $a[-4], $a[-3], $a[-2], $a[-1]); $r2= :CHOICE @c2; if ($r2 -ge 1) {return "$r1 $r2"}
  if ($r2 -lt 1) {$a[2]=$r1; :LOOP @a} }; :LOOP @args #:: index1 choices1 def1 title1  index2 choices2 def2 title2  font bc tc win
-} $:CHOICE.2x: #:: MediaCreationTool.bat gui pseudo-menu via :CHOICE snippet, streamlined in a single powershell instance
+} #:CHOICE.2x:#  MediaCreationTool.bat gui pseudo-menu via :CHOICE snippet, streamlined in a single powershell instance
 ::------------------------------------------------------------------------------------------------------------------------------::
 
-$:PRODUCTS_XML: #:: [INTERNAL]    refactored with less looping over Files; addressed more powershell 2.0 quirks
-set ^ #="$f0=[io.file]::ReadAllText($env:0);$0=($f0-split'\$%0:.*')[1];$1=$env:1-replace'([`@$])','`$1';iex(\"$0 `r`n %0 $1\")"
-set ^ #=& set "0=%~f0"& set 1=%*& powershell -nop -c %#%& exit/bat/ps1
+#:PRODUCTS_XML:#  [INTERNAL]    refactored with less looping over Files; addressed more powershell 2.0 quirks
+set ^ #=$f0=[io.file]::ReadAllText($env:0); $0=($f0-split '#\:PRODUCTS_XML\:' ,3)[1]; $1=$env:1-replace'([`@$])','`$1'; iex($0+$1)
+set ^ #=& set "0=%~f0"& set 1=;%0 %*& powershell -nop -c "%#%"& exit/bat/ps1
 function :PRODUCTS_XML { [xml]$xml = [IO.File]::ReadAllText("$pwd\products.xml",[Text.Encoding]::UTF8); $root = $null
  $eulas = 0; $langs = 0; $ver = $env:VER; $vid = $env:VID; $xi = $env:XI; if ($xi-eq'11') {$vid = "11 $env:VIS"}
  ${\\}='ht'+'tp://'; $url = "${\\}fg.ds.b1.download.windowsupdate.com/"
@@ -670,11 +683,11 @@ function :PRODUCTS_XML { [xml]$xml = [IO.File]::ReadAllText("$pwd\products.xml",
 #:: apply/insert EULA url fix to prevent MCT timing out while downloading it (likely TLS issue under naked Windows 7 host)
  $eula = "${\\}download.microsoft.com/download/C/0/3/C036B882-9F99-4BC9-A4B5-69370C4E17E9/EULA_MCTool_"; $rtf = '_6.27.16.rtf'
  if ($eulas) {
-   foreach ($i in $root.EULAS.EULA) {$i.URL = $eula + $i.LanguageCode.ToUpper() + $rtf}
+   foreach ($i in $root.EULAS.EULA) {$i.URL = $eula + $i.LanguageCode.ToUpperInvariant() + $rtf}
  } else {
    $tmp = [xml]('<EULA><LanguageCode/><URL/></EULA>'); $el = $xml.CreateElement('EULAS'); $node = $xml.ImportNode($tmp.EULA,$true)
    foreach ($lang in ($root.Languages.Language |where {$_.LanguageCode -ne 'default'})) {
-     $i = $el.AppendChild($node.Clone()); $lc = $lang.LanguageCode; $i.LanguageCode = $lc; $i.URL = $eula + $lc.ToUpper() + $rtf
+     $i = $el.AppendChild($node.Clone()); $lc = $lang.LanguageCode; $i.LanguageCode = $lc; $i.URL = $eula + $lc.ToUpperInvariant() + $rtf
    }
    $null = $root.AppendChild($el)
  }
@@ -710,7 +723,7 @@ function :PRODUCTS_XML { [xml]$xml = [IO.File]::ReadAllText("$pwd\products.xml",
    foreach ($e in 'ent','enN','pro','prN','edu','edN','clo','clN') {
      $items = $csv | & { process { if ($_.Client -eq $e) {$_} } } | group Lang -AsHashTable -AsString
      if ($null -eq $items) {continue}
-     $cli = '_CLIENT' + $edi[$e]; $up = '/upgr/'; if ($ver -eq 14393 -and $e -like 'en*') {$up = '/updt/'} #:: .toupper();
+     $cli = '_CLIENT' + $edi[$e]; $up = '/upgr/'; if ($ver -eq 14393 -and $e -like 'en*') {$up = '/updt/'} #:: .ToUpper()
      if ($e -like 'cl*') {$cli += '_RET_'} elseif ($e -like 'p*') {$cli += 'VL_VOL_'} else {$cli += '_VOL_'}
      if ($e -like 'cl*') {$BUSINESS = $edi[$e] -replace 'Cloud','S'} else {$BUSINESS = $edi[$e] -creplace 'N',' N'}
      $root.Files.File | & { process { if ($_.Edition -eq "Education") {
@@ -720,7 +733,7 @@ function :PRODUCTS_XML { [xml]$xml = [IO.File]::ReadAllText("$pwd\products.xml",
        $c = $_.Clone(); if ($c.HasAttribute('id')) {$c.RemoveAttribute('id')} $c.IsRetailOnly = 'False'; $c.Edition = $edi[$e]
        $name = $env:CB + $cli + $arch + 'FRE_' + $lang; $c.Edition_Loc = "$vid $BUSINESS"
        $c.FileName = $name + '.esd'; $c.Size = $_size; $c.Sha1 = $_sha1
-       $c.FilePath = $url + $_dir + $up + $env:CT + $name.tolower() + '_' + $_sha1 + '.esd'
+       $c.FilePath = $url + $_dir + $up + $env:CT + $name.ToLowerInvariant() + '_' + $_sha1 + '.esd'
        $null = $root.Files.AppendChild($c)
      }}}
    }
@@ -736,9 +749,9 @@ function :PRODUCTS_XML { [xml]$xml = [IO.File]::ReadAllText("$pwd\products.xml",
        if ($arch -eq 'x64')     {$_size = $item[0].Size_x64; $_sha1 = $item[0].Sha1_x64; $_dir = $item[0].Dir_x64}
        elseif ($arch -eq 'x86') {$_size = $item[0].Size_x86; $_sha1 = $item[0].Sha1_x86; $_dir = $item[0].Dir_x86} 
        if ('' -eq $_size) {$null = $root.Files.RemoveChild($_); return}
-       $name = $env:CB + $cli + $chan.ToUpper() + '_' + $arch + 'FRE_' + $_.LanguageCode
+       $name = $env:CB + $cli + $chan.ToUpperInvariant() + '_' + $arch + 'FRE_' + $_.LanguageCode
        $_.FileName = $name + '.esd'; $_.Size = $_size; $_.Sha1 = $_sha1
-       $_.FilePath = $url + $_dir + '/upgr/' + $env:CT + $name.tolower() + '_' + $_sha1 + '.esd'
+       $_.FilePath = $url + $_dir + '/upgr/' + $env:CT + $name.ToLowerInvariant() + '_' + $_sha1 + '.esd'
      }}
    }
  }
@@ -762,7 +775,7 @@ function :PRODUCTS_XML { [xml]$xml = [IO.File]::ReadAllText("$pwd\products.xml",
    }}}
  }
  $xml.Save("$pwd\products.xml");
-} $:PRODUCTS_XML: #:: MediaCreationTool.bat configuring products.xml in one go
+} #:PRODUCTS_XML:#  MediaCreationTool.bat configuring products.xml in one go
 ::------------------------------------------------------------------------------------------------------------------------------::
 
 ::# Insert business esd links in 1607,1703; Update 1909,2004,20H2,21H2,11 by hand until an updated products.xml from microsoft
